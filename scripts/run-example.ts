@@ -1,16 +1,83 @@
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { basename, join, normalize, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createJiti } from "jiti";
 
 const rootDir = resolve(import.meta.dirname, "..");
 const examplesDir = join(rootDir, "examples");
+const defaultEnvPath = join(rootDir, ".env");
 
 function isInside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
   return rel === "" || (!rel.startsWith("..") && !rel.startsWith("/") && !rel.includes("..\\"));
+}
+
+function parseEnvLine(line: string): [string, string] | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) {
+    return null;
+  }
+
+  const normalized = trimmed.startsWith("export ") ? trimmed.slice(7).trimStart() : trimmed;
+  const equalsIndex = normalized.indexOf("=");
+  if (equalsIndex <= 0) {
+    return null;
+  }
+
+  const key = normalized.slice(0, equalsIndex).trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+    return null;
+  }
+
+  let value = normalized.slice(equalsIndex + 1).trim();
+  const quote = value[0];
+  if ((quote === "\"" || quote === "'" || quote === "`") && value.endsWith(quote)) {
+    value = value.slice(1, -1);
+    if (quote === "\"") {
+      value = value
+        .replaceAll("\\n", "\n")
+        .replaceAll("\\r", "\r")
+        .replaceAll("\\t", "\t")
+        .replaceAll("\\\"", "\"")
+        .replaceAll("\\\\", "\\");
+    }
+  } else {
+    value = value.replace(/\s+#.*$/, "").trim();
+  }
+
+  return [key, value];
+}
+
+async function loadEnvFile(filePath = defaultEnvPath): Promise<void> {
+  let content: string;
+  try {
+    content = await readFile(filePath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return;
+    }
+    throw error;
+  }
+
+  let loaded = 0;
+  for (const line of content.split(/\r?\n/)) {
+    const parsed = parseEnvLine(line);
+    if (!parsed) {
+      continue;
+    }
+
+    const [key, value] = parsed;
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+      loaded += 1;
+    }
+  }
+
+  if (loaded > 0) {
+    console.log(`已加载环境配置: ${relative(rootDir, filePath) || ".env"} (${loaded} 项)`);
+  }
 }
 
 async function listExamples(): Promise<string[]> {
@@ -42,6 +109,8 @@ async function promptForExample(examples: string[]): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  await loadEnvFile();
+
   const examples = await listExamples();
   const rawName = process.argv[2] ?? (await promptForExample(examples));
   const fileName = normalizeExampleName(rawName);
