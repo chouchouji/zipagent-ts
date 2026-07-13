@@ -26,6 +26,14 @@ pnpm test
 pnpm typecheck
 ```
 
+## 构建
+
+项目使用 `tsup` 构建 npm 发布产物，输出目录为 `dist/`，同时生成 ESM、CJS 和类型声明文件。
+
+```bash
+pnpm build
+```
+
 ## 基础用法
 
 ```ts
