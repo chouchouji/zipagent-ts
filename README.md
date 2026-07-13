@@ -185,6 +185,14 @@ const agent = new Agent({
 - [`quick_streaming_test.ts`](examples/quick_streaming_test.ts)：快速验证流式工具调用和 TTFB 统计。
 
 ```bash
+pnpm example
+pnpm example basic_demo
+pnpm example stream_demo.ts
+```
+
+也可以直接使用 Node 运行某个示例：
+
+```bash
 node --experimental-transform-types examples/basic_demo.ts
 node --experimental-transform-types examples/stream_demo.ts
 node --experimental-transform-types examples/mcp_demo.ts
